@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -24,8 +25,54 @@ document.addEventListener("DOMContentLoaded", () => {
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <p class="availability"><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants">
+            <h5>Participants</h5>
+            <ul class="participants-list"></ul>
+          </div>
         `;
+
+        const participantsList = activityCard.querySelector(".participants-list");
+        if (details.participants.length === 0) {
+          const emptyState = document.createElement("li");
+          emptyState.className = "no-participants";
+          emptyState.textContent = "No students signed up yet";
+          participantsList.appendChild(emptyState);
+        } else {
+          details.participants.forEach((participant) => {
+            const participantItem = document.createElement("li");
+            participantItem.dataset.participant = participant;
+            participantItem.innerHTML = `
+              <span>${participant}</span>
+              <button class="remove-participant" type="button" aria-label="Remove ${participant}" title="Remove participant">x</button>
+            `;
+
+            participantItem.querySelector(".remove-participant").addEventListener("click", async () => {
+              const response = await fetch(
+                `/activities/${encodeURIComponent(name)}/signup?email=${encodeURIComponent(participant)}`,
+                { method: "DELETE" }
+              );
+
+              if (!response.ok) {
+                return;
+              }
+
+              participantItem.remove();
+              const remainingParticipants = participantsList.querySelectorAll("li");
+              if (remainingParticipants.length === 0) {
+                const emptyState = document.createElement("li");
+                emptyState.className = "no-participants";
+                emptyState.textContent = "No students signed up yet";
+                participantsList.appendChild(emptyState);
+              }
+
+              const availability = activityCard.querySelector(".availability");
+              availability.innerHTML = `<strong>Availability:</strong> ${details.max_participants - remainingParticipants.length} spots left`;
+            });
+
+            participantsList.appendChild(participantItem);
+          });
+        }
 
         activitiesList.appendChild(activityCard);
 
@@ -62,6 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
